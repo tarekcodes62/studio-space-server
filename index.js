@@ -121,6 +121,7 @@ app.patch('/my-bookings/:bookingId/cancel', async (req, res) => {
   }
 });
 
+// add studio api
 app.post('/add-studio', async (req, res) => {
   const studio = req.body;
   const result = await studiosCollection.insertOne(studio);
