@@ -62,6 +62,7 @@ app.get('/studios', async (req, res) => {
   }
 });
 
+// studio details api
 app.get('/studios/:id', async (req, res) => {
   try {
     const { id } = req.params;
