@@ -97,6 +97,7 @@ app.get('/my-bookings/:id', async (req, res) => {
   res.send(result);
 });
 
+// cancel booking api
 app.patch('/my-bookings/:bookingId/cancel', async (req, res) => {
   try {
     const { bookingId } = req.params;
