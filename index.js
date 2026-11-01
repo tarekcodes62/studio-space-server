@@ -128,6 +128,7 @@ app.post('/add-studio', async (req, res) => {
   res.send(result);
 });
 
+// my listings api
 app.get('/my-listings/:email', async (req, res) => {
   try {
     const { email } = req.params;
