@@ -28,6 +28,7 @@ app.get('/', (req, res) => {
   res.send('This is Home page');
 });
 
+// featured studios api
 app.get('/featured-studios', async (req, res) => {
   const result = await studiosCollection
     .find({})
