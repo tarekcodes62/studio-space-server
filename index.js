@@ -85,9 +85,52 @@ app.get('/studios/:id', async (req, res) => {
 });
 
 app.post('/my-bookings', async (req, res) => {
-  const booking = req.body;
-  const result = await bookingsCollection.insertOne(booking);
-  res.send(result);
+  try {
+    const booking = req.body;
+
+    const { studioId, bookingDate, startTime, duration } = booking;
+
+    const toMinutes = time => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const newStart = toMinutes(startTime);
+    const newEnd = newStart + Number(duration) * 60;
+
+    // Find existing confirmed bookings
+    const existingBookings = await bookingsCollection
+      .find({
+        studioId,
+        bookingDate,
+        status: 'Pending',
+      })
+      .toArray();
+
+    // Check time overlap
+    const isBooked = existingBookings.some(item => {
+      const existingStart = toMinutes(item.startTime);
+      const existingEnd = existingStart + Number(item.duration) * 60;
+
+      return newStart < existingEnd && newEnd > existingStart;
+    });
+
+    if (isBooked) {
+      return res.status(409).send({
+        message: 'This studio is already booked for this time.',
+      });
+    }
+
+    const result = await bookingsCollection.insertOne(booking);
+
+    res.status(201).send({
+      message: 'Booking successful!',
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: 'Internal server error',
+    });
+  }
 });
 
 // my bookings api
