@@ -193,6 +193,7 @@ app.get('/studios/:id', async (req, res) => {
   }
 });
 
+// update studio api
 app.patch('/studios/:id', async (req, res) => {
   try {
     const { id } = req.params;
