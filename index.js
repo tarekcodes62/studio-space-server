@@ -90,6 +90,7 @@ app.post('/my-bookings', async (req, res) => {
   res.send(result);
 });
 
+// my bookings api
 app.get('/my-bookings/:id', async (req, res) => {
   const { id } = req.params;
   const result = await bookingsCollection.find({ userId: id }).toArray();
