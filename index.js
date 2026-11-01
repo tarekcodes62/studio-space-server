@@ -144,6 +144,7 @@ app.get('/my-listings/:email', async (req, res) => {
   }
 });
 
+// delete studio api
 app.delete('/studios/:id', async (req, res) => {
   try {
     const { id } = req.params;
