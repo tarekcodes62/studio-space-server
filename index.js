@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import { MongoClient, ObjectId } from 'mongodb';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const app = express();
 const port = process.env.PORT;
@@ -27,6 +28,33 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.send('This is Home page');
 });
+
+// verify token
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({
+      message: 'Unauthorized',
+    });
+  }
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).send({
+      message: 'Unauthorized access: Token is missing',
+    });
+  }
+  const JWKS = createRemoteJWKSet(
+    new URL(`${process.env.JWKS_URI}/api/auth/jwks`),
+  );
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    next();
+  } catch (error) {
+    res.status(500).send({
+      message: 'Token verification failed',
+    });
+  }
+};
 
 // featured studios api
 app.get('/featured-studios', async (req, res) => {
@@ -84,7 +112,7 @@ app.get('/studios/:id', async (req, res) => {
   }
 });
 
-app.post('/my-bookings', async (req, res) => {
+app.post('/my-bookings', verifyToken, async (req, res) => {
   try {
     const booking = req.body;
 
@@ -134,14 +162,14 @@ app.post('/my-bookings', async (req, res) => {
 });
 
 // my bookings api
-app.get('/my-bookings/:id', async (req, res) => {
+app.get('/my-bookings/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const result = await bookingsCollection.find({ userId: id }).toArray();
   res.send(result);
 });
 
 // cancel booking api
-app.patch('/my-bookings/:bookingId/cancel', async (req, res) => {
+app.patch('/my-bookings/:bookingId/cancel', verifyToken, async (req, res) => {
   try {
     const { bookingId } = req.params;
 
@@ -165,14 +193,14 @@ app.patch('/my-bookings/:bookingId/cancel', async (req, res) => {
 });
 
 // add studio api
-app.post('/add-studio', async (req, res) => {
+app.post('/add-studio', verifyToken, async (req, res) => {
   const studio = req.body;
   const result = await studiosCollection.insertOne(studio);
   res.send(result);
 });
 
 // my listings api
-app.get('/my-listings/:email', async (req, res) => {
+app.get('/my-listings/:email', verifyToken, async (req, res) => {
   try {
     const { email } = req.params;
 
@@ -188,7 +216,7 @@ app.get('/my-listings/:email', async (req, res) => {
 });
 
 // delete studio api
-app.delete('/studios/:id', async (req, res) => {
+app.delete('/studios/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -212,7 +240,7 @@ app.delete('/studios/:id', async (req, res) => {
   }
 });
 
-app.get('/studios/:id', async (req, res) => {
+app.get('/studios/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.query;
@@ -237,7 +265,7 @@ app.get('/studios/:id', async (req, res) => {
 });
 
 // update studio api
-app.patch('/studios/:id', async (req, res) => {
+app.patch('/studios/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.query;
@@ -267,6 +295,61 @@ app.patch('/studios/:id', async (req, res) => {
     res.send({ success: true, message: 'Studio updated successfully' });
   } catch (error) {
     res.status(500).send({ message: 'Failed to update studio' });
+  }
+});
+
+app.get('/dashboard', verifyToken, async (req, res) => {
+  try {
+    const { email, userId } = req.query;
+
+    if (!email) {
+      return res.status(400).send({
+        message: 'Email is required',
+      });
+    }
+
+    // Find logged-in user's studios
+    const studios = await studiosCollection
+      .find({ 'host.email': email })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Find bookings for these studios
+    const bookings = await bookingsCollection
+      .find({ userId: userId })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Calculate statistics
+    const totalStudios = studios.length;
+
+    const totalBookings = bookings.length;
+
+    const pendingBookings = bookings.filter(
+      booking => booking.status === 'Pending',
+    ).length;
+
+    const totalEarnings = bookings
+      .filter(booking => ['Confirmed', 'Completed'].includes(booking.status))
+      .reduce((total, booking) => total + Number(booking.totalPrice || 0), 0);
+
+    // Dashboard response
+    res.send({
+      stats: {
+        totalStudios,
+        totalBookings,
+        pendingBookings,
+        totalEarnings,
+      },
+
+      recentBookings: bookings.slice(0, 5),
+
+      recentStudios: studios.slice(0, 4),
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: 'Failed to load dashboard data',
+    });
   }
 });
 
